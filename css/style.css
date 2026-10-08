@@ -1832,3 +1832,96 @@ textarea:focus-visible,
     transition: none !important;
   }
 }
+
+/* ============================================================
+   PRODUCTION UI
+============================================================ */
+
+.irr-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translate(-50%, 20px);
+  z-index: 9999;
+  max-width: min(92vw, 480px);
+  padding: .85rem 1.2rem;
+  border-radius: 12px;
+  background: var(--ink);
+  color: #fff;
+  box-shadow: 0 12px 35px rgba(0,0,0,.18);
+  font-size: .9rem;
+  font-weight: 500;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .25s ease, transform .25s ease, visibility .25s;
+}
+
+.irr-toast.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+.irr-toast[data-type="error"] {
+  background: var(--danger);
+}
+
+.irr-toast[data-type="success"] {
+  background: var(--ok);
+}
+
+
+/* Floating WhatsApp */
+
+#irr-floating-wa {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 100;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #25d366;
+  color: #fff;
+  box-shadow: 0 8px 25px rgba(0,0,0,.2);
+  font-size: 1.8rem;
+  font-weight: 700;
+  transition:
+    transform .2s ease,
+    box-shadow .2s ease;
+}
+
+#irr-floating-wa:hover {
+  transform: translateY(-4px) scale(1.04);
+  box-shadow: 0 12px 30px rgba(0,0,0,.25);
+}
+
+#irr-floating-wa span {
+  transform: rotate(-20deg);
+}
+
+
+button:disabled,
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: .65;
+  transform: none !important;
+}
+
+
+@media (max-width: 560px) {
+
+  #irr-floating-wa {
+    right: 16px;
+    bottom: 16px;
+    width: 52px;
+    height: 52px;
+  }
+
+  .irr-toast {
+    bottom: 82px;
+  }
+
+}
