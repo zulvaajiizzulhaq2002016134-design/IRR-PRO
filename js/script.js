@@ -2133,21 +2133,71 @@ async function loadBookings() {
   }
 
 
-  function loadReviews() {
+ async function loadReviews() {
 
-    try {
+  const { data, error } =
+    await supabaseClient
+      .from('reviews')
+      .select(`
+        id,
+        name,
+        service,
+        rating,
+        review_text,
+        created_at
+      `)
+      .eq('approved', true)
+      .order('created_at', {
+        ascending: false
+      });
 
-      return JSON.parse(
-        localStorage.getItem(KEY)
-      ) || [];
+  if (error) {
 
-    } catch (_) {
+    console.error(
+      'Gagal mengambil ulasan:',
+      error
+    );
 
-      return [];
-
-    }
-
+    return [];
   }
+
+  return data || [];
+}
+
+
+async function saveReview(review) {
+
+  const { data, error } =
+    await supabaseClient
+      .from('reviews')
+      .insert({
+        name: review.name,
+        service: review.service,
+        rating: review.rating,
+        review_text: review.text,
+        approved: false
+      })
+      .select()
+      .single();
+
+  if (error) {
+
+    console.error(
+      'Gagal menyimpan ulasan:',
+      error
+    );
+
+    return {
+      success: false,
+      error
+    };
+  }
+
+  return {
+    success: true,
+    data
+  };
+} 
 
 
   function saveReview(review) {
