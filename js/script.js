@@ -1,45 +1,63 @@
-/* =========================================================
-   IRR EVENT ORGANIZER
-   SCRIPT.JS — PRODUCTION VERSION
-   ========================================================= */
-
 'use strict';
 
-/* =========================================================
-   1. KONFIGURASI WEBSITE
-   ========================================================= */
+/* ============================================================
+   IRR EVENT ORGANIZER
+   SCRIPT.JS — PRODUCTION VERSION
+   Supabase + WhatsApp + Calendar + Reviews
+============================================================ */
+
+/* ============================================================
+   1. KONFIGURASI
+============================================================ */
 
 const CONFIG = {
+  supabaseUrl: 'https://delsfwkdyaexvzzxvoav.supabase.co',
 
-  /* WhatsApp admin */
+  supabaseKey:
+    'sb_publishable_8Vt3ETU-oaJ1kFVoKHL_aw__aAuxKZe',
+
   whatsapp: '6285876293847',
   whatsappDisplay: '0858-7629-3847',
 
-  /* Rekening */
   accountName: 'Indah Robiah Rohmah',
 
-  /*
-   * Ganti dengan rekening resmi jika sudah tersedia.
-   *
-   * Contoh:
-   * accountInfo: 'Bank BCA — 1234567890'
-   */
   accountInfo:
     'Nomor rekening akan diinformasikan admin melalui WhatsApp.',
 
-  /* Promo */
   promoMinServices: 2,
-  promoDiscount: 0.10,
-
-  /* Review */
-  maxReviews: 100
-
+  promoDiscount: 0.10
 };
 
 
-/* =========================================================
-   2. DATA LAYANAN
-   ========================================================= */
+/* ============================================================
+   2. SUPABASE CLIENT
+============================================================ */
+
+let supabaseClient = null;
+
+function initSupabase() {
+  if (!window.supabase) {
+    console.error('Supabase library belum dimuat.');
+    return false;
+  }
+
+  try {
+    supabaseClient = window.supabase.createClient(
+      CONFIG.supabaseUrl,
+      CONFIG.supabaseKey
+    );
+
+    return true;
+  } catch (error) {
+    console.error('Gagal membuat Supabase client:', error);
+    return false;
+  }
+}
+
+
+/* ============================================================
+   3. DATA LAYANAN
+============================================================ */
 
 const SERVICES = [
 
@@ -48,7 +66,6 @@ const SERVICES = [
     icon: '🎤',
     name: 'MC Acara Ulang Tahun',
     short: 'MC Ulang Tahun',
-
     price: 300000,
     from: true,
     unit: null,
@@ -68,13 +85,11 @@ const SERVICES = [
     ]
   },
 
-
   {
     id: 'mc-lamaran',
     icon: '💍',
     name: 'MC Acara Lamaran',
     short: 'MC Lamaran',
-
     price: 400000,
     from: true,
     unit: null,
@@ -94,13 +109,11 @@ const SERVICES = [
     ]
   },
 
-
   {
     id: 'fotografer',
     icon: '📸',
     name: 'Fotografer',
     short: 'Fotografer',
-
     price: 500000,
     from: false,
     unit: null,
@@ -119,13 +132,11 @@ const SERVICES = [
     ]
   },
 
-
   {
     id: 'catering-1',
     icon: '🍗',
     name: 'Catering Paket 1',
     short: 'Catering 1',
-
     price: 20000,
     from: false,
     unit: 'porsi',
@@ -146,13 +157,11 @@ const SERVICES = [
     ]
   },
 
-
   {
     id: 'catering-2',
     icon: '🍖',
     name: 'Catering Paket 2',
     short: 'Catering 2',
-
     price: 35000,
     from: false,
     unit: 'porsi',
@@ -173,13 +182,11 @@ const SERVICES = [
     ]
   },
 
-
   {
     id: 'snack',
     icon: '🍬',
     name: 'Snack',
     short: 'Snack',
-
     price: 10000,
     from: false,
     unit: 'paket',
@@ -195,51 +202,19 @@ const SERVICES = [
       'Air minum'
     ]
   }
-
 ];
 
 
-/* =========================================================
-   3. DATA BOOKING
-   =========================================================
+/* ============================================================
+   4. BOOKING CACHE
+============================================================ */
 
-   CATATAN PENTING:
-
-   Data di bawah hanya contoh.
-
-   Sebelum website dipublikasikan:
-   HAPUS booking contoh dan masukkan booking sebenarnya.
-
-   Nanti pada tahap backend/database,
-   data ini akan kita pindahkan ke database.
-   ========================================================= */
-
-const BOOKINGS = [
-
-  {
-    date: '2026-10-17',
-    services: ['mc-ultah', 'fotografer'],
-    status: 'Terkonfirmasi'
-  },
-
-  {
-    date: '2026-10-24',
-    services: ['mc-lamaran'],
-    status: 'Terkonfirmasi'
-  },
-
-  {
-    date: '2026-10-31',
-    services: ['catering-2', 'snack'],
-    status: 'Terkonfirmasi'
-  }
-
-];
+let BOOKINGS = [];
 
 
-/* =========================================================
-   4. UTILITAS
-   ========================================================= */
+/* ============================================================
+   5. UTILITAS
+============================================================ */
 
 const $ = (selector, root = document) =>
   root.querySelector(selector);
@@ -250,11 +225,11 @@ const $$ = (selector, root = document) =>
 const byId = id =>
   SERVICES.find(service => service.id === id);
 
-const rupiah = number =>
-  'Rp' + Math.round(number).toLocaleString('id-ID');
+const rupiah = value =>
+  'Rp' + Math.round(value).toLocaleString('id-ID');
 
-const pad = number =>
-  String(number).padStart(2, '0');
+const pad = value =>
+  String(value).padStart(2, '0');
 
 const toISO = (year, month, day) =>
   `${year}-${pad(month + 1)}-${pad(day)}`;
@@ -274,15 +249,13 @@ const MONTHS = [
   'Desember'
 ];
 
-const DAYS = [
-  'Minggu',
-  'Senin',
-  'Selasa',
-  'Rabu',
-  'Kamis',
-  'Jumat',
-  'Sabtu'
-];
+const today = new Date();
+
+const TODAY_ISO = toISO(
+  today.getFullYear(),
+  today.getMonth(),
+  today.getDate()
+);
 
 
 function formatDateID(iso) {
@@ -295,13 +268,24 @@ function formatDateID(iso) {
   const date =
     new Date(year, month - 1, day);
 
+  const DAYS = [
+    'Minggu',
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu'
+  ];
+
   return `${DAYS[date.getDay()]}, ${day} ${MONTHS[month - 1]} ${year}`;
 }
 
 
 function el(tag, props = {}, ...children) {
 
-  const node = document.createElement(tag);
+  const node =
+    document.createElement(tag);
 
   Object.entries(props).forEach(([key, value]) => {
 
@@ -313,8 +297,16 @@ function el(tag, props = {}, ...children) {
       node.textContent = value;
     }
 
-    else if (key === 'html') {
-      node.innerHTML = value;
+    else if (key === 'checked') {
+      node.checked = Boolean(value);
+    }
+
+    else if (key === 'disabled') {
+      node.disabled = Boolean(value);
+    }
+
+    else if (key === 'hidden') {
+      node.hidden = Boolean(value);
     }
 
     else {
@@ -325,7 +317,7 @@ function el(tag, props = {}, ...children) {
 
   children.forEach(child => {
 
-    if (child !== null && child !== undefined) {
+    if (child) {
       node.append(child);
     }
 
@@ -335,51 +327,68 @@ function el(tag, props = {}, ...children) {
 }
 
 
-/* =========================================================
-   5. TANGGAL HARI INI
-   ========================================================= */
+/* ============================================================
+   6. TOAST NOTIFICATION
+============================================================ */
 
-const today = new Date();
+function showToast(message, type = 'success') {
 
-const TODAY_ISO =
-  toISO(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate()
-  );
+  let toast =
+    $('#irr-toast');
+
+  if (!toast) {
+
+    toast =
+      el('div', {
+        id: 'irr-toast',
+        class: 'irr-toast'
+      });
+
+    document.body.append(toast);
+  }
+
+  toast.textContent = message;
+
+  toast.dataset.type = type;
+
+  toast.classList.add('show');
+
+  clearTimeout(showToast.timer);
+
+  showToast.timer =
+    setTimeout(() => {
+
+      toast.classList.remove('show');
+
+    }, 3500);
+}
 
 
-/* =========================================================
-   6. NAVIGASI MOBILE
-   ========================================================= */
+/* ============================================================
+   7. NAVIGASI
+============================================================ */
 
-(function initNavigation() {
+(function initNav() {
 
-  const toggle = $('#nav-toggle');
-  const nav = $('#nav');
+  const toggle =
+    $('#nav-toggle');
+
+  const nav =
+    $('#nav');
 
   if (!toggle || !nav) return;
-
 
   toggle.addEventListener('click', () => {
 
     const open =
       nav.classList.toggle('open');
 
-    toggle.classList.toggle('active', open);
-
     toggle.setAttribute(
       'aria-expanded',
       String(open)
     );
 
-    document.body.classList.toggle(
-      'menu-open',
-      open
-    );
-
   });
-
 
   $$('a', nav).forEach(link => {
 
@@ -387,61 +396,34 @@ const TODAY_ISO =
 
       nav.classList.remove('open');
 
-      toggle.classList.remove('active');
-
       toggle.setAttribute(
         'aria-expanded',
         'false'
-      );
-
-      document.body.classList.remove(
-        'menu-open'
       );
 
     });
 
   });
 
-
-  document.addEventListener('keydown', event => {
-
-    if (event.key === 'Escape') {
-
-      nav.classList.remove('open');
-
-      toggle.classList.remove('active');
-
-      toggle.setAttribute(
-        'aria-expanded',
-        'false'
-      );
-
-      document.body.classList.remove(
-        'menu-open'
-      );
-
-    }
-
-  });
-
 })();
 
 
-/* =========================================================
-   7. INFORMASI UMUM WEBSITE
-   ========================================================= */
+/* ============================================================
+   8. FOOTER / WHATSAPP / PEMBAYARAN
+============================================================ */
 
-(function initWebsiteInfo() {
+(function initGlobalInfo() {
 
-  const year = $('#year');
+  const year =
+    $('#year');
 
   if (year) {
     year.textContent =
-      new Date().getFullYear();
+      today.getFullYear();
   }
 
-
-  const waLink = $('#wa-link');
+  const waLink =
+    $('#wa-link');
 
   if (waLink) {
 
@@ -450,65 +432,22 @@ const TODAY_ISO =
 
     waLink.textContent =
       `WhatsApp ${CONFIG.whatsappDisplay}`;
-
   }
 
-
-  const account =
+  const payAccount =
     $('#pay-account');
 
-  if (account) {
-    account.textContent =
+  if (payAccount) {
+    payAccount.textContent =
       CONFIG.accountInfo;
   }
 
 })();
 
 
-/* =========================================================
-   8. FLOATING WHATSAPP
-   ========================================================= */
-
-(function initFloatingWhatsApp() {
-
-  if ($('.wa-float')) return;
-
-  const link = el(
-    'a',
-    {
-      class: 'wa-float',
-      href: `https://wa.me/${CONFIG.whatsapp}`,
-      target: '_blank',
-      rel: 'noopener',
-      'aria-label': 'Chat WhatsApp IRR Event Organizer'
-    },
-
-    el(
-      'span',
-      {
-        class: 'wa-float-icon',
-        'aria-hidden': 'true',
-        text: '💬'
-      }
-    ),
-
-    el(
-      'span',
-      {
-        class: 'wa-float-text',
-        text: 'Chat WhatsApp'
-      }
-    )
-  );
-
-  document.body.append(link);
-
-})();
-
-
-/* =========================================================
+/* ============================================================
    9. KARTU LAYANAN
-   ========================================================= */
+============================================================ */
 
 (function renderServices() {
 
@@ -517,83 +456,85 @@ const TODAY_ISO =
 
   if (!grid) return;
 
-
   SERVICES.forEach(service => {
 
     const priceText =
-      (service.from ? 'Mulai dari ' : '') +
+      (service.from
+        ? 'Mulai dari '
+        : '') +
       rupiah(service.price) +
       (service.unit
         ? ` / ${service.unit}`
         : '');
 
-
     const list =
-      el(
-        'ul',
-        {
-          class: 'check-list'
-        }
-      );
-
+      el('ul', {
+        class: 'check-list'
+      });
 
     service.items.forEach(item => {
 
       list.append(
-        el(
-          'li',
-          {
-            text: item
-          }
-        )
+        el('li', {
+          text: item
+        })
       );
 
     });
-
 
     const card =
       el(
         'article',
         {
-          class: 'card service-card'
+          class:
+            'card service-card'
         },
 
         el(
           'div',
           {
-            class: 'service-icon',
-            'aria-hidden': 'true',
-            text: service.icon
+            class:
+              'service-icon',
+            'aria-hidden':
+              'true',
+            text:
+              service.icon
           }
         ),
 
         el(
           'h3',
           {
-            text: service.name
+            text:
+              service.name
           }
         ),
 
         el(
           'p',
           {
-            class: 'price',
-            text: priceText
+            class:
+              'price',
+            text:
+              priceText
           }
         ),
 
         el(
           'p',
           {
-            class: 'service-desc',
-            text: service.desc
+            class:
+              'service-desc',
+            text:
+              service.desc
           }
         ),
 
         el(
           'h4',
           {
-            text: service.title
+            text:
+              service.title
           }
         ),
 
@@ -602,35 +543,35 @@ const TODAY_ISO =
         el(
           'a',
           {
-            class: 'btn btn-ghost',
-            href: '#booking',
-            'data-pick': service.id,
-            text: 'Pesan layanan ini'
+            class:
+              'btn btn-ghost',
+            href:
+              '#booking',
+            'data-pick':
+              service.id,
+            text:
+              'Pesan layanan ini'
           }
         )
-
       );
-
 
     grid.append(card);
 
   });
-
 
   grid.addEventListener(
     'click',
     event => {
 
       const button =
-        event.target.closest('[data-pick]');
+        event.target.closest(
+          '[data-pick]'
+        );
 
       if (!button) return;
 
-      const id =
-        button.dataset.pick;
-
       setServiceChecked(
-        id,
+        button.dataset.pick,
         true
       );
 
@@ -640,9 +581,9 @@ const TODAY_ISO =
 })();
 
 
-/* =========================================================
-   10. FORM BOOKING
-   ========================================================= */
+/* ============================================================
+   10. BOOKING FORM
+============================================================ */
 
 const orderForm =
   $('#order-form');
@@ -650,26 +591,22 @@ const orderForm =
 const dateInput =
   $('#event-date');
 
-
 if (dateInput) {
-
   dateInput.min =
     TODAY_ISO;
-
 }
 
 
-/* =========================================================
-   11. PILIHAN LAYANAN BOOKING
-   ========================================================= */
+/* ============================================================
+   11. SERVICE OPTIONS
+============================================================ */
 
 (function renderServiceOptions() {
 
-  const wrap =
+  const wrapper =
     $('#service-options');
 
-  if (!wrap) return;
-
+  if (!wrapper) return;
 
   SERVICES.forEach(service => {
 
@@ -677,22 +614,25 @@ if (dateInput) {
       el(
         'label',
         {
-          class: 'pick',
-          'data-id': service.id
+          class:
+            'pick',
+          'data-id':
+            service.id
         }
       );
-
 
     const checkbox =
       el(
         'input',
         {
-          type: 'checkbox',
-          value: service.id,
-          name: 'service'
+          type:
+            'checkbox',
+          value:
+            service.id,
+          name:
+            'service'
         }
       );
-
 
     const info =
       el(
@@ -702,15 +642,18 @@ if (dateInput) {
         el(
           'span',
           {
-            class: 'p-name',
-            text: service.name
+            class:
+              'p-name',
+            text:
+              service.name
           }
         ),
 
         el(
           'span',
           {
-            class: 'p-price',
+            class:
+              'p-price',
             text:
               (service.from
                 ? 'Mulai dari '
@@ -721,23 +664,21 @@ if (dateInput) {
                 : '')
           }
         )
-
       );
-
 
     label.append(
       checkbox,
       info
     );
 
-
     if (service.unit) {
 
-      const qty =
+      const quantity =
         el(
           'span',
           {
-            class: 'qty'
+            class:
+              'qty'
           },
 
           document.createTextNode(
@@ -747,91 +688,90 @@ if (dateInput) {
           el(
             'input',
             {
-              type: 'number',
-              min: '1',
-              max: '2000',
-              value: '50',
+              type:
+                'number',
+              min:
+                '1',
+              max:
+                '2000',
+              value:
+                '50',
               'aria-label':
                 `Jumlah ${service.unit} ${service.name}`
             }
           )
-
         );
 
-
-      label.append(qty);
-
+      label.append(quantity);
     }
 
-
-    wrap.append(label);
+    wrapper.append(label);
 
   });
 
-
-  wrap.addEventListener(
+  wrapper.addEventListener(
     'change',
     updateSummary
   );
 
-  wrap.addEventListener(
+  wrapper.addEventListener(
     'input',
     updateSummary
   );
 
 
-  /* Dropdown layanan untuk ulasan */
-
   const reviewService =
     $('#rv-service');
 
-  if (!reviewService) return;
-
-
-  reviewService.append(
-    el(
-      'option',
-      {
-        value: '',
-        disabled: '',
-        selected: '',
-        text: 'Pilih layanan'
-      }
-    )
-  );
-
-
-  SERVICES.forEach(service => {
+  if (reviewService) {
 
     reviewService.append(
       el(
         'option',
         {
-          value: service.name,
-          text: service.name
+          value:
+            '',
+          disabled:
+            '',
+          selected:
+            '',
+          text:
+            'Pilih layanan'
         }
       )
     );
 
-  });
+    SERVICES.forEach(service => {
 
+      reviewService.append(
+        el(
+          'option',
+          {
+            value:
+              service.name,
+            text:
+              service.name
+          }
+        )
+      );
 
-  reviewService.append(
-    el(
-      'option',
-      {
-        value: 'Lebih dari satu layanan',
-        text: 'Lebih dari satu layanan'
-      }
-    )
-  );
+    });
+
+    reviewService.append(
+      el(
+        'option',
+        {
+          value:
+            'Lebih dari satu layanan',
+          text:
+            'Lebih dari satu layanan'
+        }
+      )
+    );
+  }
 
 })();
 
-
-/* =========================================================
-   12. CHECK / UNCHECK SERVICE
-   ========================================================= */
 
 function setServiceChecked(
   id,
@@ -843,46 +783,34 @@ function setServiceChecked(
 
   if (!row) return;
 
-
   const checkbox =
     $('input[type="checkbox"]', row);
-
-  if (!checkbox) return;
-
 
   checkbox.checked =
     checked;
 
-
   updateSummary();
 
+  const booking =
+    $('#booking');
 
-  if (checked) {
+  if (booking) {
 
-    const booking =
-      $('#booking');
+    setTimeout(() => {
 
-    if (booking) {
+      booking.scrollIntoView({
+        behavior:
+          'smooth',
+        block:
+          'start'
+      });
 
-      setTimeout(() => {
-
-        booking.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start'
-        });
-
-      }, 100);
-
-    }
+    }, 100);
 
   }
 
 }
 
-
-/* =========================================================
-   13. AMBIL PILIHAN LAYANAN
-   ========================================================= */
 
 function getSelection() {
 
@@ -901,34 +829,29 @@ function getSelection() {
       const service =
         byId(row.dataset.id);
 
-      let qty = 1;
+      let quantity = 1;
 
+      if (service.unit) {
 
-      if (service && service.unit) {
-
-        const input =
-          $('.qty input', row);
-
-        qty =
+        quantity =
           Math.max(
             1,
             Math.min(
               2000,
               parseInt(
-                input?.value,
+                $('.qty input', row)?.value,
                 10
               ) || 1
             )
           );
-
       }
-
 
       return {
         service,
-        qty,
+        qty:
+          quantity,
         line:
-          service.price * qty
+          service.price * quantity
       };
 
     });
@@ -936,58 +859,52 @@ function getSelection() {
 }
 
 
-/* =========================================================
-   14. UPDATE RINGKASAN
-   ========================================================= */
+/* ============================================================
+   12. SUMMARY
+============================================================ */
 
 function updateSummary() {
 
-  const rows =
-    $$('.pick');
-
-
-  rows.forEach(row => {
+  $$('.pick').forEach(row => {
 
     const checkbox =
       $('input[type="checkbox"]', row);
 
     row.classList.toggle(
       'on',
-      checkbox?.checked === true
+      checkbox &&
+      checkbox.checked
     );
 
   });
 
-
-  const selection =
+  const selected =
     getSelection();
-
 
   const list =
     $('#summary-list');
 
   if (!list) return;
 
-
   list.replaceChildren();
 
-
-  if (!selection.length) {
+  if (!selected.length) {
 
     list.append(
       el(
         'li',
         {
-          class: 'muted',
-          text: 'Belum ada layanan dipilih.'
+          class:
+            'muted',
+          text:
+            'Belum ada layanan dipilih.'
         }
       )
     );
 
   }
 
-
-  selection.forEach(
+  selected.forEach(
     ({
       service,
       qty,
@@ -999,7 +916,6 @@ function updateSummary() {
           ? `${service.name} × ${qty} ${service.unit}`
           : service.name;
 
-
       list.append(
         el(
           'li',
@@ -1008,7 +924,8 @@ function updateSummary() {
           el(
             'span',
             {
-              text: left
+              text:
+                left
             }
           ),
 
@@ -1022,7 +939,6 @@ function updateSummary() {
                 rupiah(line)
             }
           )
-
         )
       );
 
@@ -1031,103 +947,70 @@ function updateSummary() {
 
 
   const subtotal =
-    selection.reduce(
+    selected.reduce(
       (total, item) =>
         total + item.line,
       0
     );
 
-
   const promo =
-    selection.length >=
+    selected.length >=
     CONFIG.promoMinServices;
-
 
   const discount =
     promo
-      ? subtotal * CONFIG.promoDiscount
+      ? subtotal *
+        CONFIG.promoDiscount
       : 0;
 
-
   const total =
-    subtotal - discount;
+    subtotal -
+    discount;
 
 
-  const subtotalEl =
-    $('#sum-subtotal');
+  $('#sum-subtotal').textContent =
+    rupiah(subtotal);
 
-  const discountRow =
-    $('#sum-discount-row');
+  $('#sum-discount-row').hidden =
+    !promo;
 
-  const discountEl =
-    $('#sum-discount');
+  $('#sum-discount').textContent =
+    '-' +
+    rupiah(discount);
 
-  const totalEl =
-    $('#sum-total');
-
-  const noteEl =
-    $('#sum-note');
-
-
-  if (subtotalEl) {
-    subtotalEl.textContent =
-      rupiah(subtotal);
-  }
-
-
-  if (discountRow) {
-    discountRow.hidden =
-      !promo;
-  }
-
-
-  if (discountEl) {
-    discountEl.textContent =
-      '-' + rupiah(discount);
-  }
-
-
-  if (totalEl) {
-    totalEl.textContent =
-      rupiah(total);
-  }
+  $('#sum-total').textContent =
+    rupiah(total);
 
 
   const hasFrom =
-    selection.some(
-      item => item.service.from
+    selected.some(
+      item =>
+        item.service.from
     );
 
-
-  if (noteEl) {
-
-    if (promo) {
-
-      noteEl.textContent =
-        'Promo 10% aktif karena Anda memilih minimal 2 layanan. Harga final dikonfirmasi admin.';
-
-    }
-
-    else {
-
-      noteEl.textContent =
-        'Pilih minimal 2 layanan untuk mendapat diskon 10%.' +
-        (
-          hasFrom
-            ? ' Layanan MC berstatus "mulai dari".'
-            : ''
-        );
-
-    }
-
-  }
-
+  $('#sum-note').textContent =
+    promo
+      ? 'Promo 10% aktif karena Anda memilih minimal 2 layanan. Harga final dikonfirmasi admin.'
+      : 'Pilih minimal 2 layanan untuk mendapat diskon 10%.' +
+        (hasFrom
+          ? ' Layanan MC berstatus "mulai dari".'
+          : '');
 }
 
 
-/* =========================================================
-   15. CEK BOOKING TANGGAL
-   ========================================================= */
+/* ============================================================
+   13. CEK TANGGAL
+============================================================ */
+
+function getBookingsForDate(date) {
+
+  return BOOKINGS.filter(
+    booking =>
+      booking.event_date === date
+  );
+
+}
+
 
 if (dateInput) {
 
@@ -1140,20 +1023,15 @@ if (dateInput) {
 
       if (!hint) return;
 
-
       const found =
-        BOOKINGS.filter(
-          booking =>
-            booking.date ===
-            dateInput.value
+        getBookingsForDate(
+          dateInput.value
         );
-
 
       hint.classList.toggle(
         'warn-text',
         found.length > 0
       );
-
 
       if (!dateInput.value) {
 
@@ -1161,38 +1039,34 @@ if (dateInput) {
           '';
 
         return;
-
       }
-
 
       if (found.length) {
 
-        const serviceNames =
+        const names =
           [
             ...new Set(
               found.flatMap(
                 booking =>
-                  booking.services.map(
-                    id =>
-                      byId(id)?.short
-                  )
+                  (booking.services || [])
+                    .map(item =>
+                      item.short ||
+                      byId(item.id)?.short ||
+                      item.name
+                    )
               )
             )
-          ].filter(Boolean);
-
+          ];
 
         hint.textContent =
-          'Tanggal ini sudah ada booking: ' +
-          serviceNames.join(', ') +
+          'Tanggal ini sudah memiliki booking: ' +
+          names.join(', ') +
           '. Admin akan mengonfirmasi ketersediaan.';
 
-      }
-
-      else {
+      } else {
 
         hint.textContent =
           'Tanggal ini masih kosong.';
-
       }
 
     }
@@ -1201,77 +1075,118 @@ if (dateInput) {
 }
 
 
-/* =========================================================
-   16. VALIDASI NOMOR WHATSAPP
-   ========================================================= */
+/* ============================================================
+   14. SIMPAN BOOKING SUPABASE
+============================================================ */
 
-function normalizePhone(phone) {
+async function saveBookingToDatabase(
+  booking
+) {
 
-  return phone
-    .replace(/[^\d+]/g, '')
-    .trim();
+  if (!supabaseClient) {
+
+    return {
+      success:
+        false,
+      error:
+        'Koneksi database belum tersedia.'
+    };
+
+  }
+
+  try {
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient
+        .from('bookings')
+        .insert([
+          booking
+        ])
+        .select()
+        .single();
+
+    if (error) {
+
+      console.error(
+        'Supabase booking error:',
+        error
+      );
+
+      return {
+        success:
+          false,
+        error:
+          error.message
+      };
+    }
+
+    return {
+      success:
+        true,
+      data
+    };
+
+  } catch (error) {
+
+    console.error(error);
+
+    return {
+      success:
+        false,
+      error:
+        error.message
+    };
+
+  }
 
 }
 
 
-function isValidPhone(phone) {
-
-  const normalized =
-    normalizePhone(phone);
-
-  return /^[+]?[0-9]{8,15}$/.test(
-    normalized
-  );
-
-}
-
-
-/* =========================================================
-   17. FORM BOOKING → WHATSAPP
-   ========================================================= */
+/* ============================================================
+   15. SUBMIT BOOKING
+============================================================ */
 
 if (orderForm) {
 
   orderForm.addEventListener(
     'submit',
-    event => {
+    async event => {
 
       event.preventDefault();
 
-
-      const error =
+      const errorElement =
         $('#form-error');
 
+      const submitButton =
+        $('button[type="submit"]', orderForm);
 
       const name =
         $('#client-name')
           ?.value
-          .trim() || '';
-
+          .trim();
 
       const phone =
         $('#client-phone')
           ?.value
-          .trim() || '';
+          .trim();
 
-
-      const type =
+      const eventType =
         $('#event-type')
-          ?.value || '';
+          ?.value;
 
-
-      const date =
+      const eventDate =
         dateInput
-          ?.value || '';
-
+          ?.value;
 
       const notes =
         $('#event-notes')
           ?.value
-          .trim() || '';
+          .trim();
 
-
-      const selection =
+      const selected =
         getSelection();
 
 
@@ -1285,7 +1200,10 @@ if (orderForm) {
       }
 
 
-      if (!isValidPhone(phone)) {
+      if (
+        !/^[0-9+\-\s()]{8,}$/
+          .test(phone)
+      ) {
 
         problems.push(
           'nomor WhatsApp yang valid'
@@ -1294,7 +1212,7 @@ if (orderForm) {
       }
 
 
-      if (!type) {
+      if (!eventType) {
 
         problems.push(
           'jenis acara'
@@ -1303,7 +1221,7 @@ if (orderForm) {
       }
 
 
-      if (!date) {
+      if (!eventDate) {
 
         problems.push(
           'tanggal acara'
@@ -1311,7 +1229,10 @@ if (orderForm) {
 
       }
 
-      else if (date < TODAY_ISO) {
+      else if (
+        eventDate <
+        TODAY_ISO
+      ) {
 
         problems.push(
           'tanggal acara yang belum lewat'
@@ -1320,7 +1241,7 @@ if (orderForm) {
       }
 
 
-      if (!selection.length) {
+      if (!selected.length) {
 
         problems.push(
           'minimal satu layanan'
@@ -1331,29 +1252,30 @@ if (orderForm) {
 
       if (problems.length) {
 
-        if (error) {
+        if (errorElement) {
 
-          error.textContent =
+          errorElement.textContent =
             'Mohon lengkapi: ' +
             problems.join(', ') +
             '.';
 
-          error.hidden = false;
+          errorElement.hidden =
+            false;
 
         }
 
         return;
-
       }
 
 
-      if (error) {
-        error.hidden = true;
+      if (errorElement) {
+        errorElement.hidden =
+          true;
       }
 
 
       const subtotal =
-        selection.reduce(
+        selected.reduce(
           (total, item) =>
             total + item.line,
           0
@@ -1361,7 +1283,7 @@ if (orderForm) {
 
 
       const promo =
-        selection.length >=
+        selected.length >=
         CONFIG.promoMinServices;
 
 
@@ -1373,11 +1295,135 @@ if (orderForm) {
 
 
       const total =
-        subtotal - discount;
+        subtotal -
+        discount;
 
+
+      const servicesData =
+        selected.map(
+          ({
+            service,
+            qty,
+            line
+          }) => ({
+            id:
+              service.id,
+
+            name:
+              service.name,
+
+            quantity:
+              qty,
+
+            unit:
+              service.unit,
+
+            price:
+              service.price,
+
+            subtotal:
+              line
+          })
+        );
+
+
+      const bookingData = {
+
+        customer_name:
+          name,
+
+        phone:
+          phone,
+
+        event_type:
+          eventType,
+
+        event_date:
+          eventDate,
+
+        services:
+          servicesData,
+
+        notes:
+          notes || null,
+
+        status:
+          'Menunggu Konfirmasi'
+
+      };
+
+
+      /* Loading */
+
+      const originalText =
+        submitButton
+          ?.textContent;
+
+      if (submitButton) {
+
+        submitButton.disabled =
+          true;
+
+        submitButton.textContent =
+          'Menyimpan booking...';
+
+      }
+
+
+      const result =
+        await saveBookingToDatabase(
+          bookingData
+        );
+
+
+      if (submitButton) {
+
+        submitButton.disabled =
+          false;
+
+        submitButton.textContent =
+          originalText ||
+          'Kirim Pesanan via WhatsApp';
+
+      }
+
+
+      if (!result.success) {
+
+        if (errorElement) {
+
+          errorElement.textContent =
+            'Booking belum dapat disimpan. Silakan coba lagi atau langsung hubungi WhatsApp admin.';
+
+          errorElement.hidden =
+            false;
+
+        }
+
+        showToast(
+          'Booking gagal disimpan.',
+          'error'
+        );
+
+        return;
+      }
+
+
+      /* Masukkan booking baru ke cache */
+
+      BOOKINGS.push(
+        {
+          ...bookingData,
+          id:
+            result.data?.id
+        }
+      );
+
+
+      /* Pesan WhatsApp */
 
       const lines =
-        selection.map(
+        selected.map(
           ({
             service,
             qty,
@@ -1399,19 +1445,27 @@ if (orderForm) {
         );
 
 
+      const bookingId =
+        result.data?.id
+          ? `#IRR-${result.data.id}`
+          : '#IRR';
+
+
       const message = [
 
         'Halo IRR Event Organizer, saya ingin booking:',
 
         '',
 
+        `ID Booking: ${bookingId}`,
+
         `Nama: ${name}`,
 
         `WhatsApp: ${phone}`,
 
-        `Jenis acara: ${type}`,
+        `Jenis acara: ${eventType}`,
 
-        `Tanggal acara: ${formatDateID(date)}`,
+        `Tanggal acara: ${formatDateID(eventDate)}`,
 
         '',
 
@@ -1435,23 +1489,42 @@ if (orderForm) {
 
         '',
 
-        'Mohon konfirmasi ketersediaan tanggal dan penawarannya. Terima kasih.'
+        'Booking sudah dikirim melalui website.',
+
+        'Mohon konfirmasi ketersediaan dan penawaran final.',
+
+        'Terima kasih.'
 
       ]
-        .filter(line => line !== '')
+        .filter(Boolean)
         .join('\n');
 
 
-      const url =
-        `https://wa.me/${CONFIG.whatsapp}` +
-        `?text=${encodeURIComponent(message)}`;
-
-
-      window.open(
-        url,
-        '_blank',
-        'noopener'
+      showToast(
+        'Booking berhasil dicatat. Membuka WhatsApp...',
+        'success'
       );
+
+
+      setTimeout(
+        () => {
+
+          window.open(
+            `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(message)}`,
+            '_blank',
+            'noopener'
+          );
+
+        },
+        500
+      );
+
+
+      /* Reset form */
+
+      orderForm.reset();
+
+      updateSummary();
 
     }
   );
@@ -1459,9 +1532,78 @@ if (orderForm) {
 }
 
 
-/* =========================================================
-   18. KALENDER BOOKING
-   ========================================================= */
+/* ============================================================
+   16. LOAD BOOKINGS DARI SUPABASE
+============================================================ */
+
+async function loadBookings() {
+
+  if (!supabaseClient) {
+    return;
+  }
+
+  try {
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient
+        .from('bookings')
+        .select('*')
+        .eq(
+          'status',
+          'Terkonfirmasi'
+        )
+        .order(
+          'event_date',
+          {
+            ascending:
+              true
+          }
+        );
+
+
+    if (error) {
+
+      console.error(
+        'Gagal mengambil booking:',
+        error
+      );
+
+      return;
+    }
+
+
+    BOOKINGS =
+      Array.isArray(data)
+        ? data
+        : [];
+
+
+    if (
+      window.IRRCalendarRender
+    ) {
+
+      window.IRRCalendarRender();
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      'Load booking error:',
+      error
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   17. KALENDER
+============================================================ */
 
 (function initCalendar() {
 
@@ -1489,27 +1631,45 @@ if (orderForm) {
     null;
 
 
-  function bookingsOn(iso) {
+  function bookingsOn(date) {
 
     return BOOKINGS.filter(
       booking =>
-        booking.date === iso
+        booking.event_date === date
     );
 
   }
 
 
-  function servicesOn(iso) {
+  function servicesOn(date) {
 
-    return [
-      ...new Set(
-        bookingsOn(iso)
-          .flatMap(
-            booking =>
-              booking.services
-          )
-      )
-    ];
+    const bookings =
+      bookingsOn(date);
+
+    const all = [];
+
+    bookings.forEach(
+      booking => {
+
+        (
+          booking.services ||
+          []
+        ).forEach(service => {
+
+          const id =
+            service.id ||
+            service;
+
+          if (!all.includes(id)) {
+            all.push(id);
+          }
+
+        });
+
+      }
+    );
+
+    return all;
 
   }
 
@@ -1518,7 +1678,6 @@ if (orderForm) {
 
     title.textContent =
       `${MONTHS[month]} ${year}`;
-
 
     grid.replaceChildren();
 
@@ -1540,9 +1699,9 @@ if (orderForm) {
 
 
     for (
-      let index = 0;
-      index < firstDay;
-      index++
+      let i = 0;
+      i < firstDay;
+      i++
     ) {
 
       grid.append(
@@ -1574,7 +1733,7 @@ if (orderForm) {
         );
 
 
-      const serviceIds =
+      const ids =
         servicesOn(iso);
 
 
@@ -1584,37 +1743,56 @@ if (orderForm) {
 
 
       if (iso < TODAY_ISO) {
-        classes.push('past');
+
+        classes.push(
+          'past'
+        );
+
       }
 
 
       if (iso === TODAY_ISO) {
-        classes.push('today');
+
+        classes.push(
+          'today'
+        );
+
       }
 
 
-      if (serviceIds.length) {
-        classes.push('booked');
+      if (ids.length) {
+
+        classes.push(
+          'booked'
+        );
+
       }
 
 
-      if (iso === selected) {
-        classes.push('selected');
+      if (
+        iso === selected
+      ) {
+
+        classes.push(
+          'selected'
+        );
+
       }
 
 
-      const label =
+      const names =
+        ids
+          .map(id =>
+            byId(id)?.short ||
+            id
+          );
+
+
+      const aria =
         `${formatDateID(iso)}. ` +
         (
-          serviceIds.length
-            ? 'Booking: ' +
-              serviceIds
-                .map(
-                  id =>
-                    byId(id)?.short
-                )
-                .filter(Boolean)
-                .join(', ')
+          names.length
+            ? `Booking: ${names.join(', ')}`
             : 'Kosong'
         );
 
@@ -1625,44 +1803,39 @@ if (orderForm) {
           {
             class:
               classes.join(' '),
-
             type:
               'button',
-
             'data-date':
               iso,
-
             'aria-label':
-              label
+              aria
           },
 
           el(
             'span',
             {
-              class: 'num',
-              text: String(day)
+              class:
+                'num',
+              text:
+                String(day)
             }
           )
-
         );
 
 
-      serviceIds
+      ids
         .slice(0, 2)
         .forEach(id => {
-
-          const service =
-            byId(id);
-
-          if (!service) return;
-
 
           cell.append(
             el(
               'span',
               {
-                class: 'tag',
-                text: service.short
+                class:
+                  'tag',
+                text:
+                  byId(id)?.short ||
+                  id
               }
             )
           );
@@ -1670,7 +1843,7 @@ if (orderForm) {
         });
 
 
-      if (serviceIds.length > 2) {
+      if (ids.length > 2) {
 
         cell.append(
           el(
@@ -1678,9 +1851,8 @@ if (orderForm) {
             {
               class:
                 'tag more',
-
               text:
-                `+${serviceIds.length - 2}`
+                `+${ids.length - 2}`
             }
           )
         );
@@ -1712,7 +1884,6 @@ if (orderForm) {
         {
           class:
             'detail-date',
-
           text:
             formatDateID(iso)
         }
@@ -1731,7 +1902,8 @@ if (orderForm) {
         el(
           'p',
           {
-            class: 'muted',
+            class:
+              'muted',
             text:
               'Belum ada booking pada tanggal ini.'
           }
@@ -1746,16 +1918,27 @@ if (orderForm) {
         booking => {
 
           const names =
-            booking.services
-              .map(
-                id =>
-                  byId(id)?.name
-              )
-              .filter(Boolean)
-              .join(' + ');
+            (
+              booking.services ||
+              []
+            )
+              .map(service => {
+
+                const id =
+                  service.id ||
+                  service;
+
+                return (
+                  service.name ||
+                  byId(id)?.name ||
+                  id
+                );
+
+              });
 
 
           detail.append(
+
             el(
               'div',
               {
@@ -1767,7 +1950,7 @@ if (orderForm) {
                 'strong',
                 {
                   text:
-                    names
+                    names.join(' + ')
                 }
               ),
 
@@ -1776,7 +1959,6 @@ if (orderForm) {
                 {
                   class:
                     'status',
-
                   text:
                     booking.status ||
                     'Terkonfirmasi'
@@ -1784,6 +1966,7 @@ if (orderForm) {
               )
 
             )
+
           );
 
         }
@@ -1794,10 +1977,10 @@ if (orderForm) {
         el(
           'p',
           {
-            class: 'fine',
-
+            class:
+              'fine',
             text:
-              'Satu tanggal bisa dipakai beberapa layanan. Hubungi kami untuk memastikan.'
+              'Satu tanggal dapat memiliki beberapa layanan. Hubungi kami untuk memastikan ketersediaan.'
           }
         )
       );
@@ -1813,10 +1996,8 @@ if (orderForm) {
           {
             class:
               'btn btn-primary',
-
             type:
               'button',
-
             text:
               'Booking tanggal ini'
           }
@@ -1827,27 +2008,24 @@ if (orderForm) {
         'click',
         () => {
 
-          if (!dateInput) return;
+          if (dateInput) {
 
+            dateInput.value =
+              iso;
 
-          dateInput.value =
-            iso;
+            dateInput.dispatchEvent(
+              new Event(
+                'change'
+              )
+            );
 
-
-          dateInput.dispatchEvent(
-            new Event(
-              'change'
-            )
-          );
+          }
 
 
           $('#booking')
             ?.scrollIntoView({
               behavior:
-                'smooth',
-
-              block:
-                'start'
+                'smooth'
             });
 
         }
@@ -1870,19 +2048,14 @@ if (orderForm) {
           '.cal-cell[data-date]'
         );
 
-
       if (!cell) return;
-
 
       selected =
         cell.dataset.date;
 
-
       render();
 
-      showDetail(
-        selected
-      );
+      showDetail(selected);
 
     }
   );
@@ -1898,7 +2071,6 @@ if (orderForm) {
         if (month < 0) {
 
           month = 11;
-
           year--;
 
         }
@@ -1919,7 +2091,6 @@ if (orderForm) {
         if (month > 11) {
 
           month = 0;
-
           year++;
 
         }
@@ -1930,22 +2101,25 @@ if (orderForm) {
     );
 
 
+  window.IRRCalendarRender =
+    render;
+
+
   render();
 
 })();
 
 
-/* =========================================================
-   19. SISTEM ULASAN
-   ========================================================= */
+/* ============================================================
+   18. REVIEWS
+============================================================ */
 
 (function initReviews() {
 
   const KEY =
     'irr_reviews_v2';
 
-
-  const listEl =
+  const list =
     $('#review-list');
 
   const form =
@@ -1954,8 +2128,7 @@ if (orderForm) {
   const text =
     $('#rv-text');
 
-
-  if (!listEl || !form || !text) {
+  if (!list || !form || !text) {
     return;
   }
 
@@ -1964,20 +2137,11 @@ if (orderForm) {
 
     try {
 
-      const data =
-        JSON.parse(
-          localStorage.getItem(KEY)
-        );
+      return JSON.parse(
+        localStorage.getItem(KEY)
+      ) || [];
 
-      if (!Array.isArray(data)) {
-        return [];
-      }
-
-      return data;
-
-    }
-
-    catch (_) {
+    } catch (_) {
 
       return [];
 
@@ -1991,27 +2155,20 @@ if (orderForm) {
     const all =
       loadReviews();
 
-
     all.unshift(review);
-
 
     try {
 
       localStorage.setItem(
         KEY,
         JSON.stringify(
-          all.slice(
-            0,
-            CONFIG.maxReviews
-          )
+          all.slice(0, 100)
         )
       );
 
       return true;
 
-    }
-
-    catch (_) {
+    } catch (_) {
 
       return false;
 
@@ -2022,13 +2179,12 @@ if (orderForm) {
 
   function starsNode(rating) {
 
-    const stars =
+    const wrapper =
       el(
         'span',
         {
           class:
             'stars',
-
           'aria-label':
             `${rating} dari 5 bintang`
         }
@@ -2036,23 +2192,21 @@ if (orderForm) {
 
 
     for (
-      let index = 1;
-      index <= 5;
-      index++
+      let i = 1;
+      i <= 5;
+      i++
     ) {
 
-      stars.append(
+      wrapper.append(
         el(
           'span',
           {
             class:
-              index <= rating
+              i <= rating
                 ? ''
                 : 'off',
-
             text:
               '★',
-
             'aria-hidden':
               'true'
           }
@@ -2061,42 +2215,38 @@ if (orderForm) {
 
     }
 
-
-    return stars;
+    return wrapper;
 
   }
 
 
   function render() {
 
-    const all =
+    const reviews =
       loadReviews();
 
-
-    listEl.replaceChildren();
+    list.replaceChildren();
 
 
     const summary =
       $('#rating-summary');
 
-
     if (summary) {
 
       summary.hidden =
-        !all.length;
+        !reviews.length;
 
     }
 
 
-    if (!all.length) {
+    if (!reviews.length) {
 
-      listEl.append(
+      list.append(
         el(
           'div',
           {
             class:
               'empty-state',
-
             text:
               'Belum ada ulasan. Jadilah yang pertama menulis ulasan!'
           }
@@ -2109,11 +2259,13 @@ if (orderForm) {
 
 
     const average =
-      all.reduce(
+      reviews.reduce(
         (total, review) =>
-          total + Number(review.rating),
+          total +
+          Number(review.rating),
         0
-      ) / all.length;
+      ) /
+      reviews.length;
 
 
     $('#avg-score').textContent =
@@ -2121,7 +2273,7 @@ if (orderForm) {
 
 
     $('#avg-stars')
-      ?.replaceChildren(
+      .replaceChildren(
         starsNode(
           Math.round(average)
         )
@@ -2129,10 +2281,10 @@ if (orderForm) {
 
 
     $('#avg-count').textContent =
-      `${all.length} ulasan`;
+      `${reviews.length} ulasan`;
 
 
-    all.forEach(review => {
+    reviews.forEach(review => {
 
       const date =
         new Date(
@@ -2146,7 +2298,7 @@ if (orderForm) {
         `${date.getFullYear()}`;
 
 
-      listEl.append(
+      list.append(
 
         el(
           'article',
@@ -2167,10 +2319,8 @@ if (orderForm) {
               {
                 class:
                   'avatar',
-
                 'aria-hidden':
                   'true',
-
                 text:
                   (
                     review.name?.[0] ||
@@ -2204,7 +2354,9 @@ if (orderForm) {
           ),
 
           starsNode(
-            Number(review.rating)
+            Number(
+              review.rating
+            )
           ),
 
           el(
@@ -2256,12 +2408,12 @@ if (orderForm) {
       const name =
         $('#rv-name')
           ?.value
-          .trim() || '';
+          .trim();
 
 
       const service =
         $('#rv-service')
-          ?.value || '';
+          ?.value;
 
 
       const rating =
@@ -2276,29 +2428,23 @@ if (orderForm) {
 
 
       if (!name) {
-
         problems.push(
           'nama'
         );
-
       }
 
 
       if (!service) {
-
         problems.push(
           'layanan'
         );
-
       }
 
 
       if (!rating) {
-
         problems.push(
           'penilaian bintang'
         );
-
       }
 
 
@@ -2336,7 +2482,7 @@ if (orderForm) {
       }
 
 
-      const success =
+      const saved =
         saveReview({
 
           name,
@@ -2357,12 +2503,12 @@ if (orderForm) {
         });
 
 
-      if (!success) {
+      if (!saved) {
 
         if (error) {
 
           error.textContent =
-            'Ulasan tidak dapat disimpan di browser ini. Silakan coba lagi.';
+            'Ulasan tidak dapat disimpan pada browser ini.';
 
           error.hidden =
             false;
@@ -2376,23 +2522,22 @@ if (orderForm) {
 
       form.reset();
 
-
-      const counter =
-        $('#rv-count');
-
-      if (counter) {
-        counter.textContent =
-          '0';
-      }
+      $('#rv-count').textContent =
+        '0';
 
 
       render();
 
 
-      listEl.scrollIntoView({
+      showToast(
+        'Ulasan berhasil ditambahkan.',
+        'success'
+      );
+
+
+      list.scrollIntoView({
         behavior:
           'smooth',
-
         block:
           'start'
       });
@@ -2406,25 +2551,80 @@ if (orderForm) {
 })();
 
 
-/* =========================================================
-   20. INISIALISASI AWAL
-   ========================================================= */
+/* ============================================================
+   19. FLOATING WHATSAPP
+============================================================ */
 
-updateSummary();
+(function initFloatingWhatsApp() {
 
+  if ($('#irr-floating-wa')) {
+    return;
+  }
 
-/* =========================================================
-   21. ERROR HANDLING DASAR
-   ========================================================= */
+  const button =
+    el(
+      'a',
+      {
+        id:
+          'irr-floating-wa',
 
-window.addEventListener(
-  'error',
-  event => {
+        href:
+          `https://wa.me/${CONFIG.whatsapp}`,
 
-    console.warn(
-      'IRR Website:',
-      event.message
+        target:
+          '_blank',
+
+        rel:
+          'noopener',
+
+        'aria-label':
+          'Hubungi IRR Event Organizer melalui WhatsApp',
+
+        title:
+          'Chat WhatsApp'
+      },
+
+      el(
+        'span',
+        {
+          text:
+            '☏'
+        }
+      )
     );
 
+
+  document.body.append(
+    button
+  );
+
+})();
+
+
+/* ============================================================
+   20. INITIALIZATION
+============================================================ */
+
+(async function initApp() {
+
+  updateSummary();
+
+  const connected =
+    initSupabase();
+
+
+  if (!connected) {
+
+    showToast(
+      'Mode database belum aktif.',
+      'error'
+    );
+
+    return;
+
   }
-);
+
+
+  await loadBookings();
+
+})();
