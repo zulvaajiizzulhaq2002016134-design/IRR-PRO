@@ -1,5 +1,18 @@
 'use strict';
+/* =========================================================
+   SUPABASE
+========================================================= */
 
+const SUPABASE_URL =
+  'https://delsfwkdyaexvzzxvoav.supabase.co';
+
+const SUPABASE_PUBLISHABLE_KEY =
+  'sb_publishable_8Vt3ETU-oaJ1kFVoKHL_aw__aAuxKZe';
+
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
 /* ============================================================
    IRR EVENT ORGANIZER
    SCRIPT.JS — PRODUCTION VERSION
