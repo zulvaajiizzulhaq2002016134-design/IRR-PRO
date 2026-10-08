@@ -2220,10 +2220,9 @@ async function loadBookings() {
   }
 
 
-  function render() {
+  async function render() {
 
-    const reviews =
-      loadReviews();
+  const all = await loadReviews();
 
     list.replaceChildren();
 
