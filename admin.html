@@ -1,0 +1,76 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin IRR Event Organizer</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body { background: #fbf6fd; }
+    .admin-wrap { max-width: 900px; margin: 50px auto; padding: 20px; }
+    .admin-card { background: white; border: 1px solid #eadff0;
+      border-radius: 16px; padding: 25px; margin-bottom: 20px; }
+    .admin-input { width: 100%; padding: 12px; margin: 6px 0 15px;
+      border: 1px solid #eadff0; border-radius: 9px; }
+    .review-admin { border: 1px solid #eadff0; border-radius: 12px;
+      padding: 16px; margin: 14px 0; overflow-wrap: anywhere; }
+    .admin-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .btn-approve { background: #21885b; color: white; }
+    .btn-reject { background: #b83248; color: white; }
+    .admin-message { margin: 12px 0; overflow-wrap: anywhere; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main class="admin-wrap">
+    <h1>Admin <span style="color:#a64cc4">IRR</span></h1>
+    <p>Pengelolaan ulasan pelanggan</p>
+
+    <section class="admin-card" id="login-panel">
+      <h2>Login Admin</h2>
+      <form id="login-form">
+        <label for="email">Email admin</label>
+        <input class="admin-input" id="email" type="email"
+          autocomplete="username" required>
+
+        <label for="password">Password</label>
+        <input class="admin-input" id="password" type="password"
+          autocomplete="current-password" required>
+
+        <button class="btn btn-primary" type="submit" id="login-button">
+          Login
+        </button>
+      </form>
+      <p id="login-message" class="admin-message" role="status"></p>
+    </section>
+
+    <section id="dashboard" hidden>
+      <div class="admin-card">
+        <p id="admin-identity"></p>
+        <button id="refresh-button" class="btn btn-ghost" type="button">
+          Muat ulang ulasan
+        </button>
+        <button id="logout-button" class="btn btn-ghost" type="button">
+          Logout
+        </button>
+        <p id="dashboard-message" class="admin-message" role="status"></p>
+      </div>
+
+      <div class="admin-card">
+        <h2>Menunggu persetujuan</h2>
+        <div id="pending-list">Memuat ulasan...</div>
+      </div>
+
+      <div class="admin-card">
+        <h2>Ulasan yang telah diproses</h2>
+        <div id="processed-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
